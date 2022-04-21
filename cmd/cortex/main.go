@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"flag"
 	"fmt"
@@ -13,10 +14,17 @@ import (
 	"time"
 
 	"github.com/go-kit/log/level"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/version"
-	"github.com/weaveworks/common/tracing"
+	"go.opentelemetry.io/contrib/propagators/aws/xray"
+	"go.opentelemetry.io/otel"
+	otbridge "go.opentelemetry.io/otel/bridge/opentracing"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"gopkg.in/yaml.v2"
 
 	"github.com/cortexproject/cortex/pkg/cortex"
@@ -157,12 +165,36 @@ func main() {
 			name += "-" + cfg.Target[0]
 		}
 
-		// Setting the environment variable JAEGER_AGENT_HOST enables tracing.
-		if trace, err := tracing.NewFromEnv(name); err != nil {
-			level.Error(util_log.Logger).Log("msg", "Failed to setup tracing", "err", err.Error())
-		} else {
-			defer trace.Close()
+		if jaegerHost, ok := os.LookupEnv("JAEGER_AGENT_HOST"); ok {
+			exp, err := jaeger.New(jaeger.WithAgentEndpoint(jaeger.WithAgentHost(jaegerHost)))
+			if err != nil {
+				level.Error(util_log.Logger).Log("msg", "Failed to create Jaeger exporter", "err", err.Error())
+			} else {
+				tp := trace.NewTracerProvider(
+					trace.WithIDGenerator(xray.NewIDGenerator()),
+					trace.WithBatcher(exp),
+					trace.WithResource(resource.NewWithAttributes(
+						semconv.SchemaURL,
+						semconv.ServiceNameKey.String("cortex"),
+					)),
+				)
+				defer func() {
+					if err := tp.Shutdown(context.Background()); err != nil {
+						level.Error(util_log.Logger).Log("msg", "Failed to shut down tracer provider", "err", err.Error())
+					}
+				}()
+				bridge, wrappedProvider := otbridge.NewTracerPair(tp.Tracer("github.com/cortexproject/cortex/cmd/cortex"))
+				opentracing.SetGlobalTracer(bridge)
+				otel.SetTracerProvider(wrappedProvider)
+			}
 		}
+
+		// Setting the environment variable JAEGER_AGENT_HOST enables tracing.
+		// if trace, err := tracing.NewFromEnv(name); err != nil {
+		// 	level.Error(util_log.Logger).Log("msg", "Failed to setup tracing", "err", err.Error())
+		// } else {
+		// 	defer trace.Close()
+		// }
 	}
 
 	// Initialise seed for randomness usage.

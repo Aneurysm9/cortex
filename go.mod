@@ -63,6 +63,11 @@ require (
 	go.etcd.io/etcd v3.3.25+incompatible
 	go.etcd.io/etcd/api/v3 v3.5.0
 	go.etcd.io/etcd/client/v3 v3.5.0
+	go.opentelemetry.io/contrib/propagators/aws v1.6.0 // indirect
+	go.opentelemetry.io/otel v1.6.1 // indirect
+	go.opentelemetry.io/otel/bridge/opentracing v1.6.1 // indirect
+	go.opentelemetry.io/otel/exporters/jaeger v1.6.1 // indirect
+	go.opentelemetry.io/otel/sdk v1.6.1 // indirect
 	go.uber.org/atomic v1.9.0
 	golang.org/x/net v0.0.0-20220325170049-de3da57026de
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
@@ -95,3 +100,5 @@ replace github.com/thanos-io/thanos v0.22.0 => github.com/thanos-io/thanos v0.19
 
 // Replace memberlist with Grafana's fork which includes some fixes that haven't been merged upstream yet
 replace github.com/hashicorp/memberlist => github.com/grafana/memberlist v0.2.5-0.20211201083710-c7bc8e9df94b
+
+replace github.com/efficientgo/tools/core => github.com/efficientgo/tools/core v0.0.0-20220225185207-fe763185946b
